@@ -80,22 +80,20 @@ sudoif command *args:
 # Arguments:
 #   $target_image - The tag you want to apply to the image (default: $image_name).
 #   $tag - The tag for the image (default: $default_tag).
-#   $version - The version string for the image (optional).
 #
-# The script constructs the version string using the provided version parameter.
+# The script constructs the version string using the tag and the current date.
 # If the git working directory is clean, it also includes the short SHA of the current HEAD.
 #
-# just build $target_image $tag $version
+# just build $target_image $tag
 #
 # Example usage:
 #   just build myimage mytag
-#   just build myimage mytag 1.2.3
 #
 # This will build an image 'myimage:mytag'
 #
 
 # Build the image using the specified parameters
-build $target_image=image_name $tag=default_tag $version="":
+build $target_image=image_name $tag=default_tag:
     #!/usr/bin/env bash
 
     set -euox pipefail
@@ -108,7 +106,7 @@ build $target_image=image_name $tag=default_tag $version="":
         LABELS+=("--label" "org.opencontainers.image.documentation=https://raw.githubusercontent.com/{{ repo_organization }}/{{ image_name }}/${GIT_SHA}/README.md")
         LABELS+=("--label" "org.opencontainers.image.source=https://github.com/{{ repo_organization }}/{{ image_name }}/blob/${GIT_SHA}/Containerfile")
         LABELS+=("--label" "org.opencontainers.image.url=https://github.com/{{ repo_organization }}/{{ image_name }}/tree/${GIT_SHA}")
-        LABELS+=("--label" "org.opencontainers.image.version=${version:-{{ default_tag }}.$(date +%Y%m%d)-${GIT_SHA}}")
+        LABELS+=("--label" "org.opencontainers.image.version={{ default_tag }}.$(date +%Y%m%d)-${GIT_SHA}")
     fi
 
     # Image metadata for https://artifacthub.io/ - This is optional but is highly recommended so we all can get a index of all the custom images
@@ -122,9 +120,6 @@ build $target_image=image_name $tag=default_tag $version="":
     LABELS+=("--label" "org.opencontainers.image.description={{ image_desc }}")
     LABELS+=("--label" "org.opencontainers.image.title={{ image_name }}")
     LABELS+=("--label" "org.opencontainers.image.vendor={{ repo_organization }}")
-
-    # Ostree metadata for rpm-ostree status
-    LABELS+=("--label" "ostree.version=${version:-{{ default_tag }}.$(date +%Y%m%d)-${GIT_SHA}}")
 
     # This actually builds the image!
     PODMAN_BUILD_ARGS=("${BUILD_ARGS[@]}" "${LABELS[@]}" --pull=newer --tag "${target_image}:${tag}" --file Containerfile)
@@ -254,11 +249,9 @@ image_name $target_image=image_name:
 # Parameters:
 #   $target_image - The name of the target image to be loaded or pulled.
 #   $tag - The tag of the target image to be loaded or pulled. Default is 'default_tag'.
-#   $version - The version string for the image (optional).
 #
 # Example usage:
 #   _rootful_load_image my_image latest
-#   _rootful_load_image my_image latest 1.2.3
 #
 # Steps:
 # 1. Check if the script is already running as root or under sudo.
@@ -266,7 +259,7 @@ image_name $target_image=image_name:
 # 3. If the image is found, load it into rootful podman using podman scp.
 # 4. If the image is not found, pull it from the remote repository into reootful podman.
 
-_rootful_load_image $target_image=image_name $tag=default_tag $version="":
+_rootful_load_image $target_image=image_name $tag=default_tag:
     #!/usr/bin/env bash
     set -eoux pipefail
 
@@ -307,7 +300,7 @@ _rootful_load_image $target_image=image_name $tag=default_tag $version="":
 #   config: The configuration file to use for the build (default: disk_config/disk.toml)
 
 # Example: just _rebuild-bib localhost/fedora latest qcow2 disk_config/disk.toml
-_build-bib $target_image $tag $type $config $version="": (_rootful_load_image target_image tag version)
+_build-bib $target_image $tag $type $config: (_rootful_load_image target_image tag)
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -344,31 +337,31 @@ _build-bib $target_image $tag $type $config $version="": (_rootful_load_image ta
 #   config: The configuration file to use for the build (deafult: disk_config/disk.toml)
 
 # Example: just _rebuild-bib localhost/fedora latest qcow2 disk_config/disk.toml
-_rebuild-bib $target_image $tag $type $config $version="": (build target_image tag version) && (_build-bib target_image tag type config version)
+_rebuild-bib $target_image $tag $type $config: (build target_image tag) && (_build-bib target_image tag type config)
 
 # Build a QCOW2 virtual machine image
 [group('Build Virtal Machine Image')]
-build-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $version="": && (_build-bib target_image tag "qcow2" "disk_config/disk.toml" version)
+build-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag: && (_build-bib target_image tag "qcow2" "disk_config/disk.toml")
 
 # Build a RAW virtual machine image
 [group('Build Virtal Machine Image')]
-build-raw $target_image=("localhost/" + image_name) $tag=default_tag $version="": && (_build-bib target_image tag "raw" "disk_config/disk.toml" version)
+build-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_build-bib target_image tag "raw" "disk_config/disk.toml")
 
 # Build an ISO virtual machine image
 [group('Build Virtal Machine Image')]
-build-iso $target_image=("localhost/" + image_name) $tag=default_tag $version="": && (_build-bib target_image tag "iso" "disk_config/iso.toml" version)
+build-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_build-bib target_image tag "iso" "disk_config/iso.toml")
 
 # Rebuild a QCOW2 virtual machine image
 [group('Build Virtal Machine Image')]
-rebuild-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag $version="": && (_rebuild-bib target_image tag "qcow2" "disk_config/disk.toml" version)
+rebuild-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag: && (_rebuild-bib target_image tag "qcow2" "disk_config/disk.toml")
 
 # Rebuild a RAW virtual machine image
 [group('Build Virtal Machine Image')]
-rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag $version="": && (_rebuild-bib target_image tag "raw" "disk_config/disk.toml" version)
+rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_rebuild-bib target_image tag "raw" "disk_config/disk.toml")
 
 # Rebuild an ISO virtual machine image
 [group('Build Virtal Machine Image')]
-rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag $version="": && (_rebuild-bib target_image tag "iso" "disk_config/iso.toml" version)
+rebuild-iso $target_image=("localhost/" + image_name) $tag=default_tag: && (_rebuild-bib target_image tag "iso" "disk_config/iso.toml")
 
 # Run a virtual machine with the specified image type and configuration
 _run-vm $target_image $tag $type $config:

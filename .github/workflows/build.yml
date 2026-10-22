@@ -66,22 +66,13 @@ jobs:
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
 
-      - name: Extract Base Image Version
-        id: base-version
-        run: |
-          # Construct base image from registry and image name (avoid hardcoding)
-          BASE_IMAGE="${IMAGE_REGISTRY}/${IMAGE_NAME}:stable"
-          VERSION=$(skopeo inspect docker://${BASE_IMAGE} | jq -r '.Labels["org.opencontainers.image.version"] // empty')
-          echo "IMAGE_VERSION=$VERSION" >> $GITHUB_ENV
-
       # This actually builds the container image
       - name: Build Image
         id: build-image
         run: |
           just build \
             ${IMAGE_NAME} \
-            ${DEFAULT_TAG} \
-            ${IMAGE_VERSION:-}
+            ${DEFAULT_TAG}
 
       # This is optional, this provides smaller delta updates
       - name: Rechunk with rpm-ostree
@@ -89,8 +80,7 @@ jobs:
         run: |
           just ostree-rechunk \
             ${IMAGE_NAME} \
-            ${DEFAULT_TAG} \
-            ${IMAGE_VERSION:-}
+            ${DEFAULT_TAG}
 
       # If you are feeling adventurous, use the new distro agnostic rechunker
       # https://github.com/coreos/chunkah
@@ -100,8 +90,7 @@ jobs:
       #  run: |
       #    just rechunk \
       #      ${IMAGE_NAME} \
-      #      ${DEFAULT_TAG} \
-      #      ${IMAGE_VERSION:-}
+      #      ${DEFAULT_TAG}
 
       - name: Generate Build Tags
         id: gen-build-tags
